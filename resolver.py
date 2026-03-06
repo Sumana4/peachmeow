@@ -108,9 +108,9 @@ def main():
         subprocess.run(["git","add",VERSIONS_FILE], check=True)
 
         if len(removed) == 1:
-            msg = f"release: remove stale patch source → {removed[0]}"
+            msg = f"delete: stale patch source → {removed[0]}"
         else:
-            msg = "release: remove stale patch sources → " + ", ".join(removed)
+            msg = "delete: stale patch sources → " + ", ".join(removed)
 
         subprocess.run(["git","commit","-m", msg], check=False)
         subprocess.run(["git","push"], check=True)
