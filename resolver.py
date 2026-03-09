@@ -59,6 +59,30 @@ def resolve(repo, mode):
 
     return mode
 
+def resolve_channels(repo):
+    r = requests.get(
+        f"https://api.github.com/repos/{repo}/releases",
+        headers=HEADERS,
+        timeout=60
+    )
+    if r.status_code != 200:
+        die(f"Failed to fetch {repo}")
+
+    rel = r.json()
+
+    latest = None
+    dev = None
+
+    for x in rel:
+        if not latest and not x["prerelease"]:
+            latest = x["tag_name"].lstrip("v")
+        if not dev and x["prerelease"]:
+            dev = x["tag_name"].lstrip("v")
+        if latest and dev:
+            break
+
+    return latest, dev
+
 def trigger(src):
     print(f"[+] Trigger build: {src}")
     subprocess.run(
@@ -118,24 +142,127 @@ def main():
     changed = []
 
     for src, mode in sources.items():
-        latest = resolve(src, mode)
+
         stored = old.get(src, {})
 
-        prev_version = stored.get("version")
+        if mode == "latest":
+            if "dev" in stored:
+                stored.pop("dev")
+                dirty = True
+                removed.append(src)
+        elif mode == "dev":
+            if "latest" in stored:
+                stored.pop("latest")
+                dirty = True
+                removed.append(src)
+        elif mode != "all":
+            if "latest" in stored and "dev" in stored:
+                stored.pop("dev")
+                dirty = True
+                removed.append(src)
+
+        if mode != "all":
+
+            latest = resolve(src, mode)
+
+            if mode == "dev":
+                prev_version = stored.get("dev", {}).get("patch")
+            else:
+                prev_version = stored.get("latest", {}).get("patch")
+
+            print(src)
+            print("  latest :", latest)
+            print("  stored :", prev_version)
+
+            if latest and latest != prev_version:
+                changed.append(src)
+
+            continue
+
+        latest_stable, latest_dev = resolve_channels(src)
+
+        stored_latest = stored.get("latest", {}).get("patch")
+        stored_dev = stored.get("dev", {}).get("patch")
 
         print(src)
-        print("  latest :", latest)
-        print("  stored :", prev_version)
+        print("  upstream latest :", latest_stable)
+        print("  upstream dev    :", latest_dev)
+        print("  stored latest   :", stored_latest)
+        print("  stored dev      :", stored_dev)
 
-        if latest and latest != prev_version:
-            changed.append(src)
+        stable_changed = latest_stable and latest_stable != stored_latest
+        dev_changed = latest_dev and latest_dev != stored_dev
+
+        if stable_changed:
+            changed.append(("stable", src))
+            continue
+
+        if dev_changed:
+            changed.append(("dev", src))
 
     if not changed:
         print("[✓] No patch updates")
         return
 
-    for s in changed:
-        trigger(s)
+    for item in changed:
+
+        if isinstance(item, tuple):
+            channel, src = item
+
+            if channel == "stable":
+
+                cfg_text = Path(CONFIG_FILE).read_text()
+                lines = []
+
+                current_block = None
+                current_src = global_patches
+
+                for line in cfg_text.splitlines():
+
+                    stripped = line.strip()
+
+                    if stripped.startswith("[") and stripped.endswith("]"):
+                        current_block = stripped
+                        current_src = global_patches
+                        lines.append(line)
+                        continue
+
+                    if "=" in line and current_block:
+                        key, val = line.split("=",1)
+                        key = key.strip()
+
+                        if key == "patches-source":
+                            current_src = val.strip().strip('"')
+
+                        if current_src == src and key in {"patches-version", "cli-version"}:
+                            continue
+
+                    lines.append(line)
+
+                Path(CONFIG_FILE).write_text("\n".join(lines))
+
+                trigger(src)
+
+            else:
+                trigger(src)
+
+        else:
+            trigger(item)
+
+    if dirty and removed:
+        Path(VERSIONS_FILE).write_text(json.dumps(old, indent=2))
+
+        subprocess.run(["git","config","user.name","github-actions[bot]"], check=True)
+        subprocess.run(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"], check=True)
+        subprocess.run(["git","add",VERSIONS_FILE], check=True)
+
+        if len(removed) == 1:
+            msg = f"delete: unused version channels → {removed[0]}"
+        else:
+            msg = "delete: unused version channels → " + ", ".join(removed)
+
+        subprocess.run(["git","commit","-m", msg], check=False)
+        subprocess.run(["git","push"], check=True)
 
     print("[✓] Resolver done")
 

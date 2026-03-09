@@ -478,7 +478,12 @@ versions = {}
 if Path(VERSIONS_FILE).exists():
     versions = json.loads(Path(VERSIONS_FILE).read_text())
 
-versions[patch_src] = {"version": patch_ver, "cli": CLI_VERSION}
+entry = versions.setdefault(patch_src, {})
+
+if is_prerelease:
+    entry["dev"] = {"patch": patch_ver, "cli": CLI_VERSION}
+else:
+    entry["latest"] = {"patch": patch_ver, "cli": CLI_VERSION}
 
 Path(VERSIONS_FILE).write_text(json.dumps(versions, indent=2))
 
