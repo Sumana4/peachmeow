@@ -211,13 +211,13 @@ for table, app in apps.items():
     if src not in targets:
         continue
 
-    mode = ("latest" if BUILD_MODE == "stable" else BUILD_MODE) or (app.get("patches-version") or global_patch_mode)
+    mode = ("latest" if BUILD_MODE == "stable" else "dev" if BUILD_MODE == "pre-release" else BUILD_MODE) or (app.get("patches-version") or global_patch_mode)
     PATCH_VERSION, IS_PRE = resolve(src, mode)
 
     used_patch_versions[src] = PATCH_VERSION
 
     cli_src = app.get("cli-source") or global_cli
-    cli_mode = ("latest" if BUILD_MODE == "stable" else BUILD_MODE) or (app.get("cli-version") or global_cli_mode)
+    cli_mode = ("latest" if BUILD_MODE == "stable" else "dev" if BUILD_MODE == "pre-release" else BUILD_MODE) or (app.get("cli-version") or global_cli_mode)
 
     version_key = f"{cli_src}@{cli_mode}"
 
