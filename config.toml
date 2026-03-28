@@ -19,7 +19,7 @@ package-name = "com.google.android.apps.photos"
 app-source = "rjaakash/peachmeow-store"
 patches-source = "RookieEnough/De-ReVanced"
 morphe-brand = "De-ReVanced"
-version = "7.68.0.884121604"
+version = "7.69.0.888996316"
 patcher-args = "-e 'Enable DCIM folders backup control'"
 
 ["Proton VPN hoo-dles"]
@@ -28,7 +28,7 @@ package-name = "ch.protonvpn.android"
 app-source = "ProtonVPN/android-app"
 patches-source = "hoo-dles/morphe-patches"
 morphe-brand = "hoo-dles"
-version = "5.17.14.0"
+version = "5.17.21.0"
 patcher-args = "-f"
 
 [Reddit]
