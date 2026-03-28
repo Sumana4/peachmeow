@@ -376,7 +376,7 @@ for table, app in apps.items():
 
     run([
         "java","-jar","tools/morphe-cli.jar","patch",
-        "--keystore","morphe-release.bks",
+        "--keystore",require_env("SIGNING_KEYSTORE_FILE"),
         "--keystore-password",SIGNING_KEYSTORE_PASSWORD,
         "--keystore-entry-alias",SIGNING_KEY_ALIAS,
         "--keystore-entry-password",SIGNING_KEY_PASSWORD,
@@ -516,6 +516,8 @@ if remote_check.stdout.strip() == "":
     subprocess.run(["git","fetch","origin",STATE_BRANCH],check=False)
 
 if remote_check.stdout.strip() != "":
+    subprocess.run(["git","reset","--hard"], check=True)
+    subprocess.run(["git","clean","-fd"], check=True)
     subprocess.run(["git","checkout","-B",STATE_BRANCH,f"origin/{STATE_BRANCH}"],check=True)
 
 versions = {}
