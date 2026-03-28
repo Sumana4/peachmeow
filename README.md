@@ -24,57 +24,14 @@ Just set up your `config.toml` by following CONFIG.md.
 
 All APKs published in GitHub Releases are **Official 🐱 PeachMeow Builds**.
 
-These are 🐱 PeachMeow releases — they are NOT builds made by upstream projects.
+All builds are produced and published by 🌚 [me](https://github.com/rjaakash) via **[GitHub Actions](https://github.com/apps/github-actions)** using patches and tools from upstream projects (Morphe, De-ReVanced, hoo-dles, Anddea, etc.).
 
-They are built and released by 🌚 [me](https://github.com/rjaakash) via **[GitHub Actions](https://github.com/apps/github-actions)** using upstream sources and tooling.
+These builds are not official releases from upstream projects or their maintainers.
 
 If you’re just looking for builds:
 
 👉 **[Releases](https://github.com/rjaakash/peachmeow/releases)**  
 👉 **[MicroG RE Releases](https://github.com/MorpheApp/MicroG-RE/releases)**
-
----
-
-## 🔐 Required GitHub Secrets
-
-When you fork the repo, add these secrets:
-
-- `SIGNING_KEYSTORE_B64`  
-- `SIGNING_KEYSTORE_PASSWORD`  
-- `SIGNING_KEY_ALIAS`  
-- `SIGNING_KEY_PASSWORD`  
-- `PEACHMEOW_GITHUB_PAT`  
-
-### PAT requirements
-
-`PEACHMEOW_GITHUB_PAT` must be **Fine‑grained**.
-
-Permissions:
-
-- Contents: Read + Write  
-- Actions: Read + Write  
-
----
-
-## 🔑 Keystore
-
-Upload your signing keystore as base64:
-
-```
-base64 morphe-release.bks
-```
-
-Save output into:
-
-```
-SIGNING_KEYSTORE_B64
-```
-
-Keystore filename must be:
-
-```
-morphe-release.bks
-```
 
 ---
 
@@ -86,4 +43,4 @@ morphe-release.bks
 
 ---
 
-🐾 Meow.
+🐾 Meow. The cat ships.

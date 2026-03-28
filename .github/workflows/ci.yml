@@ -18,11 +18,18 @@ jobs:
 
       - run: sudo apt-get update && sudo apt-get install -y python3 gh
 
-      - env:
-          PEACHMEOW_GITHUB_PAT: ${{ secrets.PEACHMEOW_GITHUB_PAT }}
-          GH_TOKEN: ${{ secrets.PEACHMEOW_GITHUB_PAT }}
-        run: |
+      - run: |
           set -e
+
+          if [ "${{ github.repository }}" = "rjaakash/peachmeow" ]; then
+            if [ -z "${{ secrets.PEACHMEOW_GITHUB_PAT }}" ]; then
+              echo "PEACHMEOW_GITHUB_PAT is required in main repo"
+              exit 1
+            fi
+            export GH_TOKEN="${{ secrets.PEACHMEOW_GITHUB_PAT }}"
+          else
+            export GH_TOKEN="${{ github.token }}"
+          fi
 
           python3 resolver.py
 
