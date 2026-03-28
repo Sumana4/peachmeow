@@ -145,6 +145,12 @@ for t in shlex.split(cfg.get("patcher-args", "")):
 
 apps = {k: v for k, v in cfg.items() if isinstance(v, dict)}
 
+source_order = []
+for app in apps.values():
+    src = app.get("patches-source") or global_patches
+    if src not in source_order:
+        source_order.append(src)
+
 def resolve(repo, mode):
     rel = gh(f"https://api.github.com/repos/{repo}/releases")
     if not rel:
@@ -531,7 +537,17 @@ if is_prerelease:
 else:
     entry["latest"] = {"patch": patch_ver, "cli": CLI_VERSION}
 
-Path(VERSIONS_FILE).write_text(json.dumps(versions, indent=2))
+ordered_versions = {}
+
+for src in source_order:
+    if src in versions:
+        ordered_versions[src] = versions[src]
+
+for src in versions:
+    if src not in ordered_versions:
+        ordered_versions[src] = versions[src]
+
+Path(VERSIONS_FILE).write_text(json.dumps(ordered_versions, indent=2))
 
 subprocess.run(["git","config","user.name","github-actions[bot]"],check=True)
 subprocess.run(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"],check=True)
