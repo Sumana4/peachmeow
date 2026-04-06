@@ -22,6 +22,11 @@ BUILD_SOURCE = args.source
 BUILD_MODE = args.mode
 DRY = args.dry_run
 
+log_plain_section("Build Start")
+log_kv("Mode", BUILD_MODE)
+log_kv("Source", BUILD_SOURCE or "all")
+log_kv("Dry Run", DRY)
+
 SIGNING_KEYSTORE_PASSWORD = require_env("SIGNING_KEYSTORE_PASSWORD")
 SIGNING_KEY_ALIAS = require_env("SIGNING_KEY_ALIAS")
 SIGNING_KEY_PASSWORD = require_env("SIGNING_KEY_PASSWORD")
@@ -209,6 +214,7 @@ for r in gh("https://api.github.com/repos/REAndroid/APKEditor/releases"):
         break
 
 if apkeditor and not DRY:
+    log_sub("APKEditor")
     if download_with_retry(apkeditor, "tools/apkeditor.jar") != 0:
         die("apkeditor download failed")
 
@@ -229,6 +235,8 @@ for table, app in apps.items():
     if src not in targets:
         continue
 
+    log_section(table)
+
     mode = (
         "latest"
         if BUILD_MODE == "stable"
@@ -238,6 +246,10 @@ for table, app in apps.items():
     PATCH_VERSION, IS_PRE = resolve(src, mode)
     used_patch_versions[src] = PATCH_VERSION
 
+    log_sub("Resolved")
+    log_kv("Patch Source", src)
+    log_kv("Patch Version", PATCH_VERSION)
+
     cli_src = app.get("cli-source") or global_cli
     cli_mode = (
         "latest"
@@ -246,6 +258,9 @@ for table, app in apps.items():
     ) or (app.get("cli-version") or global_cli_mode)
 
     CLI_VERSION, _ = resolve(cli_src, cli_mode)
+
+    log_kv("CLI Source", cli_src)
+    log_kv("CLI Version", CLI_VERSION)
 
     current_cli = (cli_src, CLI_VERSION)
 
@@ -280,6 +295,9 @@ for table, app in apps.items():
         CLI_URL = selected["browser_download_url"]
         CLI_FILENAME = selected["name"]
 
+        log_sub("CLI")
+        log_kv("File", CLI_FILENAME)
+
         cli_file = f"{cli_dir}/{CLI_FILENAME}"
 
         if not DRY:
@@ -291,6 +309,7 @@ for table, app in apps.items():
     else:
         CLI_FILENAME = seen_cli_files[current_cli]
         cli_file = f"{cli_dir}/{CLI_FILENAME}"
+        log_cache(f"CLI reused: {CLI_FILENAME}")
 
     patch_owner, patch_repo = src.split("/")
     patch_dir = f"patches/{patch_owner}/{patch_repo}"
@@ -325,6 +344,9 @@ for table, app in apps.items():
         PATCH_URL = selected["browser_download_url"]
         PATCH_FILENAME = selected["name"]
 
+        log_sub("Patches")
+        log_kv("File", PATCH_FILENAME)
+
         patch_file = f"{patch_dir}/{PATCH_FILENAME}"
 
         if not DRY:
@@ -336,6 +358,7 @@ for table, app in apps.items():
     else:
         PATCH_FILENAME = seen_patch_files[current_patch]
         patch_file = f"{patch_dir}/{PATCH_FILENAME}"
+        log_cache(f"Patch reused: {PATCH_FILENAME}")
 
     pkg = app.get("package-name") or die(table)
     repo = app.get("app-source") or die(table)
@@ -405,7 +428,8 @@ for table, app in apps.items():
 
     final = "-".join(parts) + ".apk"
 
-    print("Build:", final)
+    log_space()
+    log_done(f"Output: {final}")
 
     if DRY:
         continue
@@ -430,6 +454,10 @@ for table, app in apps.items():
     if not APK and not APKM:
         die(table)
 
+    log_sub("App")
+    log_kv("Package", pkg)
+    log_kv("Version", APP)
+
     out = f"temp/{name}.apk"
 
     if APK:
@@ -439,6 +467,8 @@ for table, app in apps.items():
         apkm_path = f"temp/{name}.apkm"
         if download_with_retry(APKM, apkm_path) != 0:
             die(table)
+
+        log_sub("Merging")
 
         run(
             [
@@ -464,6 +494,8 @@ for table, app in apps.items():
         if strip_override
         else ([global_striplibs] if global_striplibs else [])
     ) + [t for t in app_args if not t.startswith("--striplibs=")]
+
+    log_sub("Patching")
 
     run(
         [
@@ -492,7 +524,7 @@ for table, app in apps.items():
     built.append((name, final, APP, variant))
 
 if DRY:
-    print("[✓] Dry run complete")
+    log_info("Dry run complete")
     exit(0)
 
 if not built:
@@ -697,4 +729,5 @@ for _ in range(5):
 active_brands = {a.get("morphe-brand") or global_brand for a in apps.values()}
 cleanup_old_releases(active_brands, current_tag=tag)
 
-print("[✓] Release complete")
+log_plain_section("Build Complete")
+log_done("Release finished successfully")

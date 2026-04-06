@@ -5,6 +5,7 @@ import requests
 import subprocess
 from pathlib import Path
 from packaging.version import Version
+from utils import *
 
 CONFIG_FILE = "config.toml"
 VERSIONS_FILE = "versions.json"
@@ -14,11 +15,6 @@ PEACHMEOW_GITHUB_PAT = os.environ.get("PEACHMEOW_GITHUB_PAT")
 HEADERS = {}
 if PEACHMEOW_GITHUB_PAT:
     HEADERS["Authorization"] = f"token {PEACHMEOW_GITHUB_PAT}"
-
-
-def die(m):
-    print(m, flush=True)
-    raise SystemExit(1)
 
 
 def load_config():
@@ -49,23 +45,30 @@ def resolve(repo, mode):
     rel = r.json()
 
     if not rel:
-        return None
+        return None, False
 
     if mode == "latest":
         for x in rel:
             if not x["prerelease"]:
-                return x["tag_name"].lstrip("v")
+                return x["tag_name"].lstrip("v"), False
+        return None, False
 
     if mode == "dev":
         for x in rel:
             if x["prerelease"]:
-                return x["tag_name"].lstrip("v")
-        return None
+                return x["tag_name"].lstrip("v"), True
+        return None, True
 
     if mode == "all":
-        return rel[0]["tag_name"].lstrip("v")
+        return rel[0]["tag_name"].lstrip("v"), rel[0]["prerelease"]
 
-    return mode
+    tag = mode.lstrip("v")
+
+    for x in rel:
+        if x["tag_name"].lstrip("v") == tag:
+            return tag, x["prerelease"]
+
+    return None, False
 
 
 def resolve_channels(repo):
@@ -94,15 +97,21 @@ def resolve_channels(repo):
 
 
 def trigger(src, mode=None):
-    print(f"[+] Trigger build: {src}")
+    log_sub("Trigger")
+    log_source(src)
+
+    display_mode = mode if mode else "default"
+    log_kv("Mode", display_mode)
+
     cmd = ["gh", "workflow", "run", "build.yml", "-f", f"source={src}"]
     if mode:
         cmd += ["-f", f"mode={mode}"]
+
     subprocess.run(cmd, check=True)
 
 
 def main():
-    print("[+] Resolver started")
+    log_plain_section("Resolver Start")
 
     cfg = load_config()
 
@@ -150,7 +159,8 @@ def main():
 
     for k in list(old.keys()):
         if k not in active:
-            print("[-] Removing stale source from versions.json:", k)
+            log_sub("Cleanup")
+            log_info(f"Removing stale source: {k}")
             old.pop(k)
             removed_sources.append(k)
             source_dirty = True
@@ -181,6 +191,7 @@ def main():
         subprocess.run(["git", "push"], check=True)
 
     changed = []
+    log_sub("Check")
 
     for src, mode in sources.items():
 
@@ -204,16 +215,46 @@ def main():
 
         if mode != "all":
 
-            latest = resolve(src, mode)
+            latest, is_pre = resolve(src, mode)
 
-            if mode == "dev":
+            if is_pre:
                 prev_version = stored.get("dev", {}).get("patch")
             else:
                 prev_version = stored.get("latest", {}).get("patch")
 
-            print(src)
-            print("  latest :", latest)
-            print("  stored :", prev_version)
+            log_source(src)
+
+            if mode in ["latest", "dev"]:
+                status = (
+                    "SKIPPED"
+                    if latest is None
+                    else ("UPDATE" if latest != prev_version else "UP-TO-DATE")
+                )
+            else:
+                status = (
+                    "NOT FOUND"
+                    if latest is None
+                    else ("UPDATE" if latest != prev_version else "UP-TO-DATE")
+                )
+
+            if mode in ["latest", "dev"]:
+                log_version_status(
+                    mode,
+                    [
+                        ("Upstream", latest),
+                        ("Stored", prev_version),
+                    ],
+                    status,
+                )
+            else:
+                log_version_status(
+                    mode,
+                    [
+                        ("Requested", mode),
+                        ("Stored", prev_version),
+                    ],
+                    status,
+                )
 
             if latest and latest != prev_version:
                 changed.append(src)
@@ -225,11 +266,38 @@ def main():
         stored_latest = stored.get("latest", {}).get("patch")
         stored_dev = stored.get("dev", {}).get("patch")
 
-        print(src)
-        print("  upstream latest :", latest_stable)
-        print("  upstream dev    :", latest_dev)
-        print("  stored latest   :", stored_latest)
-        print("  stored dev      :", stored_dev)
+        log_source(src)
+
+        if latest_stable is None and latest_dev is None:
+            status = "SKIPPED"
+        else:
+            stable_changed = latest_stable and (
+                stored_latest is None or Version(latest_stable) > Version(stored_latest)
+            )
+
+            dev_changed = latest_dev and latest_dev != stored_dev
+
+            if stable_changed:
+                status = "UPDATE"
+            elif dev_changed:
+                dev_base = latest_dev.split("-dev", 1)[0]
+                if stored_latest and Version(dev_base) <= Version(stored_latest):
+                    status = "UP-TO-DATE"
+                else:
+                    status = "UPDATE"
+            else:
+                status = "UP-TO-DATE"
+
+        log_version_status(
+            "all",
+            [
+                ("Stable Upstream", latest_stable),
+                ("Stable Stored", stored_latest),
+                ("Dev Upstream", latest_dev),
+                ("Dev Stored", stored_dev),
+            ],
+            status,
+        )
 
         stable_changed = latest_stable and (
             stored_latest is None or Version(latest_stable) > Version(stored_latest)
@@ -248,8 +316,14 @@ def main():
             changed.append(("dev", src))
 
     if not changed:
-        print("[✓] No patch updates")
+        log_space()
+        log_done("No patch updates")
+        log_space()
         return
+
+    log_space()
+    count = len(changed)
+    log_info(f"Changes detected: {count} source" + ("s" if count != 1 else ""))
 
     for item in changed:
 
@@ -257,7 +331,7 @@ def main():
             channel, src = item
 
             if channel == "stable":
-                trigger(src, "stable")
+                trigger(src, "latest")
             else:
                 trigger(src)
 
@@ -289,7 +363,9 @@ def main():
         subprocess.run(["git", "commit", "-m", msg], check=False)
         subprocess.run(["git", "push"], check=True)
 
-    print("[✓] Resolver done")
+    log_plain_section("Resolver Complete")
+    log_done("Finished successfully")
+    log_space()
 
 
 if __name__ == "__main__":
