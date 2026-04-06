@@ -19,7 +19,6 @@ package-name = "com.google.android.apps.photos"
 app-source = "rjaakash/peachmeow-store"
 patches-source = "RookieEnough/De-ReVanced"
 morphe-brand = "De-ReVanced"
-version = "7.70.0.891410338"
 patcher-args = "-e 'Enable DCIM folders backup control'"
 
 ["Proton VPN hoo-dles"]

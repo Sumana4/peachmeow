@@ -291,10 +291,13 @@ for table, app in apps.items():
         for p in pj.get("patches", []):
             cp = p.get("compatiblePackages") or {}
             if pkg in cp:
-                if cp[pkg] is None:
+                versions = cp[pkg]
+
+                if not versions:
                     wildcard = True
                     break
-                compat |= set(cp[pkg] or [])
+
+                compat |= set(versions)
 
         rel = gh(f"https://api.github.com/repos/{repo}/releases?per_page=100")
 
