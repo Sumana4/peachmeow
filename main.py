@@ -76,28 +76,29 @@ for app in apps.values():
 def resolve(repo, mode):
     rel = gh(f"https://api.github.com/repos/{repo}/releases")
     if not rel:
-        die(repo)
+        die(f"No releases found for {repo}")
 
     if mode == "latest":
         for r in rel:
             if not r["prerelease"]:
-                return r["tag_name"].lstrip("v"), False
+                return r["tag_name"], False
+        die(f"No stable release found for {repo}")
 
     if mode == "dev":
         for r in rel:
             if r["prerelease"]:
-                return r["tag_name"].lstrip("v"), True
+                return r["tag_name"], True
         die(f"No prerelease found for {repo}")
 
     if mode == "all":
-        return rel[0]["tag_name"].lstrip("v"), rel[0]["prerelease"]
+        r = rel[0]
+        return r["tag_name"], r["prerelease"]
 
-    tag = mode.lstrip("v")
     for r in rel:
-        if r["tag_name"].lstrip("v") == tag:
-            return tag, r["prerelease"]
+        if r["tag_name"] == mode:
+            return r["tag_name"], r["prerelease"]
 
-    return tag, False
+    die(f"Version '{mode}' not found for {repo}")
 
 
 if BUILD_SOURCE:
@@ -133,6 +134,7 @@ seen_patch = set()
 seen_cli_files = {}
 seen_patch_files = {}
 seen_unpatched_apps = {}
+pj_cache = {}
 
 for table, app in apps.items():
 
@@ -179,7 +181,7 @@ for table, app in apps.items():
     if current_cli not in seen_cli:
 
         cli_rel = gh(
-            f"https://api.github.com/repos/{cli_src}/releases/tags/v{CLI_VERSION}"
+            f"https://api.github.com/repos/{cli_src}/releases/tags/{CLI_VERSION}"
         )
 
         candidates = []
@@ -190,7 +192,7 @@ for table, app in apps.items():
                 candidates.append(a)
 
         if not candidates:
-            die(f"cli jar not found for v{CLI_VERSION}")
+            die(f"cli jar not found for {CLI_VERSION}")
 
         if len(candidates) == 1:
             selected = candidates[0]
@@ -228,7 +230,7 @@ for table, app in apps.items():
     if current_patch not in seen_patch:
 
         patch_rel = gh(
-            f"https://api.github.com/repos/{src}/releases/tags/v{PATCH_VERSION}"
+            f"https://api.github.com/repos/{src}/releases/tags/{PATCH_VERSION}"
         )
 
         candidates = []
@@ -239,7 +241,7 @@ for table, app in apps.items():
                 candidates.append(a)
 
         if not candidates:
-            die(f"patch file not found for v{PATCH_VERSION}")
+            die(f"patch file not found for {PATCH_VERSION}")
 
         if len(candidates) == 1:
             selected = candidates[0]
@@ -282,21 +284,26 @@ for table, app in apps.items():
         plist = f"https://raw.githubusercontent.com/{src}/{branch}/patches-list.json"
 
     if vm == "auto":
-        pj = requests.get(plist, timeout=60).json()
+        if plist in pj_cache:
+            pj = pj_cache[plist]
+            log_cache(f"Patches-list reused: {plist}")
+        else:
+            pj = requests.get(plist, timeout=60).json()
+            pj_cache[plist] = pj
 
         compat = set()
-        wildcard = False
 
         for p in pj.get("patches", []):
-            cp = p.get("compatiblePackages") or {}
+            cp = p.get("compatiblePackages")
+
+            if not isinstance(cp, dict):
+                continue
+
             if pkg in cp:
                 versions = cp[pkg]
 
-                if not versions:
-                    wildcard = True
-                    break
-
-                compat |= set(versions)
+                if versions:
+                    compat |= set(versions)
 
         rel = gh(f"https://api.github.com/repos/{repo}/releases?per_page=100")
 
@@ -315,12 +322,16 @@ for table, app in apps.items():
             except:
                 continue
 
-        cand = sorted(avail if wildcard else set(compat) & set(avail), key=Version)
+        if compat:
+            cand = sorted(set(compat) & set(avail), key=Version)
+        else:
+            cand = sorted(avail, key=Version)
 
         if not cand:
-            die(table)
+            cand = sorted(avail, key=Version)
 
         APP = cand[-1]
+
     else:
         APP = vm
 
@@ -334,7 +345,7 @@ for table, app in apps.items():
     if variant:
         parts.append(variant)
 
-    parts.append(f"v{PATCH_VERSION}")
+    parts.append(f"{PATCH_VERSION}")
 
     final = "-".join(parts) + ".apk"
 
@@ -459,7 +470,7 @@ if not built:
 patch_src = list(used_patch_versions.keys())[0]
 patch_ver = list(used_patch_versions.values())[0]
 
-rel = gh(f"https://api.github.com/repos/{patch_src}/releases/tags/v{patch_ver}")
+rel = gh(f"https://api.github.com/repos/{patch_src}/releases/tags/{patch_ver}")
 changelog = rel.get("body") or ""
 is_prerelease = rel.get("prerelease", False)
 
