@@ -294,23 +294,30 @@ for table, app in apps.items():
         for x in rel:
             tag = x["tag_name"]
 
-            if tag.startswith(f"{name}-"):
-                avail.append(tag.replace(f"{name}-", ""))
+            if not tag.startswith(f"{name}-"):
+                continue
+
+            ver = tag[len(name) + 1 :]
+
+            if ver.startswith("v"):
                 continue
 
             try:
-                Version(tag)
-                avail.append(tag)
+                Version(ver)
+                avail.append(ver)
             except:
                 continue
 
         if compat:
             cand = sorted(set(compat) & set(avail), key=Version)
+
+            if not cand:
+                die(f"{table}: no compatible versions found")
         else:
             cand = sorted(avail, key=Version)
 
         if not cand:
-            cand = sorted(avail, key=Version)
+            die(f"{table}: no versions available")
 
         APP = cand[-1]
     else:
@@ -338,9 +345,13 @@ for table, app in apps.items():
 
     parts = [name]
 
-    norm = APP
-    if norm.startswith(f"{name}-"):
-        norm = norm[len(name) + 1 :]
+    norm = APP.strip()
+
+    for p in (name, name.replace(" ", "-"), name.replace("-", " ")):
+        if norm.startswith(f"{p}-"):
+            norm = norm[len(p) + 1 :]
+            break
+
     if norm.startswith("v"):
         norm = norm[1:]
 
