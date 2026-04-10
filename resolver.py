@@ -50,22 +50,22 @@ def resolve(repo, mode):
     if mode == "latest":
         for x in rel:
             if not x["prerelease"]:
-                return x["tag_name"].lstrip("v"), False
+                return x["tag_name"], False
         return None, False
 
     if mode == "dev":
         for x in rel:
             if x["prerelease"]:
-                return x["tag_name"].lstrip("v"), True
+                return x["tag_name"], True
         return None, True
 
     if mode == "all":
-        return rel[0]["tag_name"].lstrip("v"), rel[0]["prerelease"]
+        return rel[0]["tag_name"], rel[0]["prerelease"]
 
-    tag = mode.lstrip("v")
+    tag = mode
 
     for x in rel:
-        if x["tag_name"].lstrip("v") == tag:
+        if x["tag_name"] == tag:
             return tag, x["prerelease"]
 
     return None, False
@@ -84,7 +84,7 @@ def resolve_channels(repo):
     dev = None
 
     for x in rel:
-        tag = x["tag_name"].lstrip("v")
+        tag = x["tag_name"]
 
         if x["prerelease"]:
             if dev is None:
