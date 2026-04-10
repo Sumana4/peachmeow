@@ -97,10 +97,10 @@ def resolve_channels(repo):
 
 
 def trigger(src, mode=None):
-    log_sub("Trigger")
+    log_sub("Trigger Build")
     log_source(src)
 
-    display_mode = mode if mode else "default"
+    display_mode = mode if mode else "None"
     log_kv("Mode", display_mode)
 
     cmd = ["gh", "workflow", "run", "build.yml", "-f", f"source={src}"]
@@ -160,7 +160,7 @@ def main():
     for k in list(old.keys()):
         if k not in active:
             log_sub("Cleanup")
-            log_info(f"Removing stale source: {k}")
+            log_info(f"Removing stale patch source: {k}")
             old.pop(k)
             removed_sources.append(k)
             source_dirty = True
@@ -228,13 +228,17 @@ def main():
                 status = (
                     "SKIPPED"
                     if latest is None
-                    else ("UPDATE" if latest != prev_version else "UP-TO-DATE")
+                    else (
+                        "UPDATE AVAILABLE" if latest != prev_version else "UP TO DATE"
+                    )
                 )
             else:
                 status = (
                     "NOT FOUND"
                     if latest is None
-                    else ("UPDATE" if latest != prev_version else "UP-TO-DATE")
+                    else (
+                        "UPDATE AVAILABLE" if latest != prev_version else "UP TO DATE"
+                    )
                 )
 
             if mode in ["latest", "dev"]:
@@ -278,15 +282,15 @@ def main():
             dev_changed = latest_dev and latest_dev != stored_dev
 
             if stable_changed:
-                status = "UPDATE"
+                status = "UPDATE AVAILABLE"
             elif dev_changed:
                 dev_base = latest_dev.split("-dev", 1)[0]
                 if stored_latest and Version(dev_base) <= Version(stored_latest):
-                    status = "UP-TO-DATE"
+                    status = "UP TO DATE"
                 else:
-                    status = "UPDATE"
+                    status = "UPDATE AVAILABLE"
             else:
-                status = "UP-TO-DATE"
+                status = "UP TO DATE"
 
         log_version_status(
             "all",
@@ -317,13 +321,13 @@ def main():
 
     if not changed:
         log_space()
-        log_done("No patch updates")
+        log_info("No patch updates")
         log_space()
         return
 
     log_space()
     count = len(changed)
-    log_info(f"Changes detected: {count} source" + ("s" if count != 1 else ""))
+    log_info(f"Changes detected: {count} patch source" + ("s" if count != 1 else ""))
 
     for item in changed:
 
@@ -364,7 +368,7 @@ def main():
         subprocess.run(["git", "push"], check=True)
 
     log_plain_section("Resolver Complete")
-    log_done("Finished successfully")
+    log_done("Resolver finished successfully")
     log_space()
 
 

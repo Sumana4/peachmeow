@@ -157,7 +157,7 @@ for table, app in apps.items():
     used_patch_versions[src] = PATCH_VERSION
 
     log_sub("Resolved")
-    log_kv("Patch Source", src)
+    log_kv("Patch", src)
     log_kv("Patch Version", PATCH_VERSION)
 
     cli_src = app.get("cli-source") or global_cli
@@ -169,7 +169,7 @@ for table, app in apps.items():
 
     CLI_VERSION, _ = resolve(cli_src, cli_mode)
 
-    log_kv("CLI Source", cli_src)
+    log_kv("CLI", cli_src)
     log_kv("CLI Version", CLI_VERSION)
 
     current_cli = (cli_src, CLI_VERSION)
@@ -196,7 +196,7 @@ for table, app in apps.items():
         CLI_FILENAME = selected["name"]
 
         log_sub("CLI")
-        log_kv("File", CLI_FILENAME)
+        log_kv("CLI File", CLI_FILENAME)
 
         cli_file = f"{cli_dir}/{CLI_FILENAME}"
 
@@ -209,7 +209,7 @@ for table, app in apps.items():
     else:
         CLI_FILENAME = seen_cli_files[current_cli]
         cli_file = f"{cli_dir}/{CLI_FILENAME}"
-        log_cache(f"CLI reused: {CLI_FILENAME}")
+        log_cache(f"CLI: {CLI_FILENAME}")
 
     patch_owner, patch_repo = src.split("/")
     patch_dir = f"patches/{patch_owner}/{patch_repo}"
@@ -236,7 +236,7 @@ for table, app in apps.items():
         PATCH_FILENAME = selected["name"]
 
         log_sub("Patches")
-        log_kv("File", PATCH_FILENAME)
+        log_kv("Patch File", PATCH_FILENAME)
 
         patch_file = f"{patch_dir}/{PATCH_FILENAME}"
 
@@ -249,7 +249,7 @@ for table, app in apps.items():
     else:
         PATCH_FILENAME = seen_patch_files[current_patch]
         patch_file = f"{patch_dir}/{PATCH_FILENAME}"
-        log_cache(f"Patch reused: {PATCH_FILENAME}")
+        log_cache(f"Patch: {PATCH_FILENAME}")
 
     pkg = app.get("package-name") or die(table)
     repo = app.get("app-source") or die(table)
@@ -268,7 +268,7 @@ for table, app in apps.items():
     if vm == "auto":
         if plist in pj_cache:
             pj = pj_cache[plist]
-            log_cache(f"Patches-list reused: {plist}")
+            log_cache(f"Patches-list: {plist}")
         else:
             pj = requests.get(plist, timeout=60).json()
             pj_cache[plist] = pj
@@ -367,7 +367,7 @@ for table, app in apps.items():
     final = "-".join(parts) + ".apk"
 
     log_space()
-    log_done(f"Output: {final}")
+    log_info(f"Output: {final}")
 
     APK = None
     APKM = None
@@ -385,7 +385,7 @@ for table, app in apps.items():
 
     log_sub("App")
     log_kv("Package", pkg)
-    log_kv("Version", APP)
+    log_kv("App Version", APP)
 
     app_download_source = APK or APKM
     app_filename = os.path.basename(app_download_source)
@@ -397,7 +397,7 @@ for table, app in apps.items():
 
     if key in seen_unpatched_apps:
         out = seen_unpatched_apps[key]
-        log_cache(f"App reused: {pkg}/{app_filename}")
+        log_cache(f"App: {pkg}/{app_filename}")
     else:
         file_path = f"{pkg_dir}/{app_filename}"
 
@@ -675,4 +675,4 @@ for _ in range(5):
         break
 
 log_plain_section("Build Complete")
-log_done("Release finished successfully")
+log_done("Release created")
