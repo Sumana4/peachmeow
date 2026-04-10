@@ -3,6 +3,7 @@ import sys
 import time
 import subprocess
 from pathlib import Path
+from typing import List, Dict
 
 RESET = "\033[0m"
 
@@ -197,3 +198,14 @@ def gh_blob_to_raw(u):
             "https://github.com/", "https://raw.githubusercontent.com/"
         ).replace("/blob/", "/")
     return u
+
+
+def get_latest_asset(assets: List[Dict]) -> Dict:
+    if not assets:
+        raise ValueError("No assets found")
+
+    latest_asset = sorted(
+        assets, key=lambda x: x.get("updated_at", "1970-01-01T00:00:00Z"), reverse=True
+    )[0]
+
+    return latest_asset

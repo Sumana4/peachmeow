@@ -27,7 +27,7 @@ package-name = "ch.protonvpn.android"
 app-source = "ProtonVPN/android-app"
 patches-source = "hoo-dles/morphe-patches"
 morphe-brand = "hoo-dles"
-version = "5.17.21.0"
+version = "🐱"
 patcher-args = "-f"
 
 [Reddit]

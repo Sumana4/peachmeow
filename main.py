@@ -183,24 +183,14 @@ for table, app in apps.items():
         cli_rel = gh(
             f"https://api.github.com/repos/{cli_src}/releases/tags/{CLI_VERSION}"
         )
-
-        candidates = []
-
-        for a in cli_rel.get("assets", []):
-            n = a["name"]
-            if n.endswith(".jar"):
-                candidates.append(a)
+        candidates = [
+            a for a in cli_rel.get("assets", []) if a["name"].endswith(".jar")
+        ]
 
         if not candidates:
             die(f"cli jar not found for {CLI_VERSION}")
 
-        if len(candidates) == 1:
-            selected = candidates[0]
-        else:
-            selected = sorted(
-                candidates,
-                key=lambda x: x.get("updated_at", ""),
-            )[-1]
+        selected = get_latest_asset(candidates)
 
         CLI_URL = selected["browser_download_url"]
         CLI_FILENAME = selected["name"]
@@ -233,23 +223,14 @@ for table, app in apps.items():
             f"https://api.github.com/repos/{src}/releases/tags/{PATCH_VERSION}"
         )
 
-        candidates = []
-
-        for a in patch_rel.get("assets", []):
-            n = a["name"]
-            if n.endswith(".mpp"):
-                candidates.append(a)
+        candidates = [
+            a for a in patch_rel.get("assets", []) if a["name"].endswith(".mpp")
+        ]
 
         if not candidates:
             die(f"patch file not found for {PATCH_VERSION}")
 
-        if len(candidates) == 1:
-            selected = candidates[0]
-        else:
-            selected = sorted(
-                candidates,
-                key=lambda x: x.get("updated_at", ""),
-            )[-1]
+        selected = get_latest_asset(candidates)
 
         PATCH_URL = selected["browser_download_url"]
         PATCH_FILENAME = selected["name"]
@@ -275,7 +256,8 @@ for table, app in apps.items():
     brand = app.get("morphe-brand") or global_brand
     name = app.get("app-name") or table
     variant = app.get("variant")
-    vm = app.get("version") or "auto"
+    vm_raw = app.get("version")
+    vm = vm_raw or "auto"
 
     if app.get("patches-list"):
         plist = gh_blob_to_raw(app.get("patches-list"))
@@ -331,14 +313,38 @@ for table, app in apps.items():
             cand = sorted(avail, key=Version)
 
         APP = cand[-1]
-
     else:
         APP = vm
 
+    if DRY:
+        continue
+
+    if vm_raw == "🐱":
+        rels = gh(f"https://api.github.com/repos/{repo}/releases?per_page=100")
+        rel = next((r for r in rels if not r["prerelease"]), None)
+
+        if not rel:
+            die(f"No 🐱 found for {repo}")
+
+        APP = rel["tag_name"]
+
+    elif vm == "auto":
+        tag = f"{name}-{APP}"
+        rel = gh(f"https://api.github.com/repos/{repo}/releases/tags/{tag}")
+
+    else:
+        tag = APP
+        rel = gh(f"https://api.github.com/repos/{repo}/releases/tags/{tag}")
+
     parts = [name]
 
-    if vm != "auto":
-        parts.append(f"v{APP}")
+    norm = APP
+    if norm.startswith(f"{name}-"):
+        norm = norm[len(name) + 1 :]
+    if norm.startswith("v"):
+        norm = norm[1:]
+
+    parts.append(f"v{norm}")
 
     parts.append(brand)
 
@@ -352,25 +358,16 @@ for table, app in apps.items():
     log_space()
     log_done(f"Output: {final}")
 
-    if DRY:
-        continue
-
-    tag = f"{name}-{APP}"
-
-    try:
-        rel = gh(f"https://api.github.com/repos/{repo}/releases/tags/{tag}")
-    except:
-        tag = APP
-        rel = gh(f"https://api.github.com/repos/{repo}/releases/tags/{tag}")
-
     APK = None
     APKM = None
 
-    for a in rel.get("assets", []):
-        if a["name"].endswith(".apk"):
-            APK = a["browser_download_url"]
-        if a["name"].endswith(".apkm"):
-            APKM = a["browser_download_url"]
+    apk_assets = [a for a in rel.get("assets", []) if a["name"].endswith(".apk")]
+    apkm_assets = [a for a in rel.get("assets", []) if a["name"].endswith(".apkm")]
+
+    if apk_assets:
+        APK = get_latest_asset(apk_assets)["browser_download_url"]
+    elif apkm_assets:
+        APKM = get_latest_asset(apkm_assets)["browser_download_url"]
 
     if not APK and not APKM:
         die(table)
