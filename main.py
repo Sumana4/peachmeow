@@ -323,9 +323,6 @@ for table, app in apps.items():
     else:
         APP = vm
 
-    if DRY:
-        continue
-
     if vm_raw == "🐱":
         rels = gh(f"https://api.github.com/repos/{repo}/releases?per_page=100")
         rel = next((r for r in rels if not r["prerelease"]), None)
@@ -368,6 +365,10 @@ for table, app in apps.items():
 
     log_space()
     log_info(f"Output: {final}")
+
+    if DRY:
+        built.append((name, final, APP, variant))
+        continue
 
     APK = None
     APKM = None
